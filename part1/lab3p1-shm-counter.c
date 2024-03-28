@@ -5,6 +5,7 @@
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <sys/wait.h>
+#include <semaphore.h>
 
 #define NUM_CHILDREN 5
 
@@ -37,6 +38,23 @@ int main()
     turn = (int *) shmat(shmid_turn, NULL, 0);
     *turn = 0;
 
+    // Initialize semaphore
+    sem_t *sem_arr;
+    int shmid_semaphore_arr;
+
+    shmid_semaphore_arr = shmget(IPC_PRIVATE, sizeof(sem_t) * NUM_CHILDREN, IPC_CREAT | 0600);
+    sem_arr = (sem_t *) shmat(shmid_semaphore_arr, NULL, 0);
+
+    // Initialize the value in the semaphore arrays
+    for (int i=0; i < NUM_CHILDREN; i++) {
+      if (i == 0) {
+        // Set the first semaphore value to 1
+        sem_init(&sem_arr[i], 1, 1);
+      } else {
+        sem_init(&sem_arr[i], 1, 0);  
+      }
+    }
+    
     for (i = 0; i < NUM_CHILDREN; i++)
     {
         pid = fork();
@@ -50,7 +68,7 @@ int main()
     }
     else if (pid == 0)
     {
-        while (*turn != i); // do nothing until it is the process's turn
+        sem_wait(&sem_arr[i]);
 
         // Child process
         printf("Child %d starts\n", i + 1);
@@ -63,6 +81,10 @@ int main()
             usleep(250000);
         }
         printf("Child %d finishes with counter %d\n", i + 1, *counter);
+        if (i != NUM_CHILDREN-1) {
+          // Set the next semaphore to 1
+          sem_post(&sem_arr[i+1]);
+        }
 
         // Processing done, increment turn to next process
         *turn = *turn + 1;
@@ -86,5 +108,10 @@ int main()
     // Detach and destroy shared memory segment
     shmdt((char *) counter);
     shmctl(shmid, IPC_RMID, 0);
+
+    // Detach and destroy semaphores
+    shmdt((char *) sem_arr);
+    shmctl(shmid_semaphore_arr, IPC_RMID, 0);
+
     return 0;
 }
