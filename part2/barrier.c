@@ -57,7 +57,10 @@ void destroy_barrier(int my_pid) {
         // and free any shared memory. Notice
         // that we explicity check that it is
         // the parent doing it.
+        shmdt(barrier);
+        shmdt(count);
+        shmctl(shmid_barrier, IPC_RMID, 0);
+        shmctl(shmid_count, IPC_RMID, 0);
     }
 }
-
 
