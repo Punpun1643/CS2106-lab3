@@ -34,12 +34,10 @@ int main() {
     for(i=0; i<VECT_SIZE; i++)
         vect[i] = rand();
 
-
-
     shmid1 = shmget(IPC_PRIVATE, NUM_PROCESSES * sizeof(int), IPC_CREAT | 0600);
     all_sum = (long int *) shmat(shmid1, NULL, 0);
     
-
+    init_barrier(NUM_PROCESSES+1);
 
     for(i=0; i<NUM_PROCESSES; i++) {
         pid = fork();
@@ -52,17 +50,31 @@ int main() {
     long int sum = 0;
 
     if(pid == 0) {
-
-	/*insert code */
-        
+     // Calculate the correct sum of the process's portion of the vector
+     int start_index = i * per_process;
+     int end_index = start_index + per_process;
+     
+     for (int j=start_index; j < end_index; j++) {
+        sum += vect[j];
+     }
+     
+     all_sum[i] = sum;
+     reach_barrier();
+     
+     exit(0);
     }
     else 
     {
         start = clock();
-    
-   	/* insert code */
-    
-	end = clock();
+        reach_barrier();
+        for (int i=0; i < NUM_PROCESSES; i++) {
+          wait(NULL);
+        }
+        
+        for (int i = 0; i < NUM_PROCESSES; i++) {
+          sum += all_sum[i];
+        }
+	      end = clock();
 
         time_taken = ((double) end - start) / CLOCKS_PER_SEC;
 
@@ -76,8 +88,7 @@ int main() {
 
         shmdt(all_sum);
         shmctl(shmid1, IPC_RMID, 0);
+        destroy_barrier(pid);
      }
 }
-
-
 
